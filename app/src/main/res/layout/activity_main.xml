@@ -39,10 +39,11 @@
         android:id="@+id/importHexagons"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_marginBottom="60dp"
         android:text="Import"
+        app:layout_constraintBottom_toTopOf="@+id/exportHexagons"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toEndOf="@+id/startLocation"
-        tools:layout_editor_absoluteY="456dp" />
+        app:layout_constraintStart_toEndOf="@+id/startLocation" />
 
     <Button
         android:id="@+id/exportHexagons"

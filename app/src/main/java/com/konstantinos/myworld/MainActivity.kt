@@ -1,5 +1,6 @@
 package com.konstantinos.myworld
 
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -13,7 +14,11 @@ import com.konstantinos.myworld.databinding.ActivityMainBinding
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import androidx.activity.viewModels
+import com.konstantinos.myworld.data.HexDAO
+import com.konstantinos.myworld.data.HexDatabase
 import com.konstantinos.myworld.data.HexEntity
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.Flow
 import java.io.IOException
@@ -22,10 +27,11 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var adapter: HexAdapter
+    private lateinit var hexDao: HexDAO
     private val viewModel: HexViewModel by viewModels()
 
     private val createFileLauncher = registerForActivityResult(
-        ActivityResultContracts.CreateDocument("text")
+        ActivityResultContracts.CreateDocument("text/bin")
     ) { uri: Uri? ->
         uri?.let {
             lifecycleScope.launch {
@@ -34,6 +40,14 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+    }
+
+    private val importLauncher = registerForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        uri?.let {
+            importHexesFromUri(this, it, hexDao)
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -45,6 +59,7 @@ class MainActivity : AppCompatActivity() {
         adapter = HexAdapter()
         binding.hexView.layoutManager = LinearLayoutManager(this)
         binding.hexView.adapter = adapter
+        hexDao = HexDatabase.getDatabase(applicationContext).hexDao()
 
         lifecycleScope.launch {
             viewModel.allHexes.collectLatest { hexList ->
@@ -71,7 +86,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
         binding.importHexagons.setOnClickListener {
-            Toast.makeText(this, "TODO", Toast.LENGTH_SHORT).show()
+            importLauncher.launch(arrayOf("*/*"))
         }
 
         binding.exportHexagons.setOnClickListener {
@@ -83,6 +98,23 @@ class MainActivity : AppCompatActivity() {
         val timestamp = java.time.LocalDateTime.now().toString().replace(":", "-")
         val defaultFileName = "export - $timestamp.mywrld"
         createFileLauncher.launch(defaultFileName)
+    }
+
+    private fun importHexesFromUri(context: Context, uri: Uri, hexDAO: HexDAO) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                context.contentResolver.openInputStream(uri)?.bufferedReader()?.useLines { lines ->
+                    lines.forEach { line ->
+                        val hex = line.trim().toLongOrNull()
+                        if (hex != null && !hexDao.isExplored(hex)) {
+                            hexDAO.insertHex(HexEntity(hex))
+                        }
+                    }
+                }
+            } catch (e: IOException) {
+                e.printStackTrace()
+            }
+        }
     }
 
     private suspend fun exportHexesToUri(uri: Uri, hexes: List<HexEntity>) {
